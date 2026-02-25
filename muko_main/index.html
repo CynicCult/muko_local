@@ -45,9 +45,8 @@
       display: flex !important;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
+      justify-content: center;
       gap: 48px;
-      padding-top: 80px;
       overflow-y: auto;
     }
     .landing-header {
@@ -379,28 +378,6 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.3);
       cursor: ew-resize;
     }
-    .preview-divider::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 40px;
-      height: 40px;
-      background: white;
-      border-radius: 50%;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    }
-    .preview-divider::after {
-      content: '⟷';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 20px;
-      color: #333;
-      z-index: 1;
-    }
     .fullscreen-btn {
       position: absolute;
       top: 12px;
@@ -482,11 +459,6 @@
           </svg>
           Lanjutkan dengan Google
         </button>
-        
-        <button class="button" onclick="muko.loginGuest()" style="margin-top: 12px; background: #f5f5f5; color: #333;">
-          Lanjutkan sebagai Guest
-        </button>
-        
       </div>
     </div>
     
@@ -844,19 +816,60 @@
     function openFullscreen() {
       const afterImg = document.getElementById('afterImage');
       if (!afterImg || !afterImg.src) return;
-      
-      // Create popup overlay
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 9999; display: flex; align-items: center; justify-content: center; cursor: zoom-out;';
-      
+
+      // 1. Buat Container Hitam Pekat yang menutupi seluruh Body HTML
+      const fsContainer = document.createElement('div');
+      fsContainer.id = 'muko-fs-container';
+      fsContainer.style.cssText = `
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: #000;
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      `;
+
+      // 2. Buat Gambar dengan resolusi asli
       const img = document.createElement('img');
       img.src = afterImg.src;
-      img.style.cssText = 'max-width: 95%; max-height: 95%; object-fit: contain;';
+      img.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
       
-      overlay.appendChild(img);
-      overlay.onclick = () => overlay.remove();
+      // 3. Tambahkan tombol "Close" di pojok agar user tidak bingung
+      const closeBtn = document.createElement('div');
+      closeBtn.innerHTML = '✕ Close Fullscreen';
+      closeBtn.style.cssText = 'position: absolute; top: 20px; right: 20px; color: white; background: rgba(0,0,0,0.5); padding: 8px 15px; border-radius: 20px; font-family: sans-serif; font-size: 14px;';
+
+      fsContainer.appendChild(img);
+      fsContainer.appendChild(closeBtn);
+      document.body.appendChild(fsContainer);
+
+      // 4. PAKSA browser SketchUp untuk masuk ke mode Full Monitor
+      const requestFS = fsContainer.requestFullscreen || 
+                        fsContainer.webkitRequestFullscreen || 
+                        fsContainer.msRequestFullscreen;
+
+      if (requestFS) {
+        requestFS.call(fsContainer).catch(err => {
+          console.log("Gagal Full Monitor: " + err.message);
+        });
+      }
+
+      // 5. Fungsi untuk keluar
+      const closeFS = () => {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        fsContainer.remove();
+      };
+
+      fsContainer.onclick = closeFS;
       
-      document.body.appendChild(overlay);
+      // Tambahkan listener tombol ESC
+      document.onkeydown = (e) => {
+        if (e.key === "Escape") closeFS();
+      };
     }
     
     window.openFullscreen = openFullscreen;

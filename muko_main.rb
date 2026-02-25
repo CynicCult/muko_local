@@ -9,15 +9,35 @@ require 'cgi'
 
 module MukoRender
   module MukoMain
+    # ==========================================
+    # 1. REGISTRASI EXTENSION MANAGER
+    # ==========================================
+    unless file_loaded?("muko_ai_registration")
+      # Mendaftarkan file ini sendiri agar muncul detailnya di Extension Manager
+      ex = SketchupExtension.new('Muko AI', __FILE__)
+      ex.description = 'Plugin Muko AI untuk rendering arsitektur terintegrasi dengan ComfyUI.'
+      ex.version     = '1.0.0'
+      ex.copyright   = '© 2026 Muko'
+      ex.creator     = 'Muko Team'
+      
+      Sketchup.register_extension(ex, true)
+      file_loaded("muko_ai_registration")
+    end
+
+    # ==========================================
+    # 2. KODE UTAMA PLUGIN
+    # ==========================================
     EXTENSION_NAME = "Muko AI"
     DEFAULT_DETAIL_MM = 1000.0
-    ASSETS_DIR = File.join(__dir__, "assets")
-    UI_DIR = File.join(__dir__, "muko_files")
+    
+    # Path disesuaikan dengan struktur Anda (assets di dalam muko_files)
+    UI_DIR = File.join(__dir__, "muko_main")
+    ASSETS_DIR = File.join(UI_DIR, "assets")
     UI_FILE = File.join(UI_DIR, "index.html")
     
     # ComfyUI Local Configuration
     COMFYUI_URL = "http://127.0.0.1:8000"
-    WORKFLOW_FILE = File.join(__dir__, "muko_files", "api.json")
+    WORKFLOW_FILE = File.join(UI_DIR, "api.json")
     RENDERS_DIR = File.join(ENV['TEMP'] || ENV['TMP'] || '/tmp', 'muko_renders')
 
     GOOGLE_CLIENT_ID = "1074133117385-33tag15q3pb4fbb3d1saqjub6e5li6p9.apps.googleusercontent.com"
@@ -28,6 +48,37 @@ module MukoRender
     GOOGLE_AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
     GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
     GOOGLE_USERINFO_URI = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+    AUTH_DATA_FILE = File.join(UI_DIR, "user_session.json")
+
+    AUTH_DATA_FILE = File.join(UI_DIR, "user_session.json")
+
+    # Panggil fungsi ini saat open_dialog pertama kali dijalankan
+    def self.load_saved_session
+      if File.exist?(AUTH_DATA_FILE)
+        begin
+          data = JSON.parse(File.read(AUTH_DATA_FILE))
+          # Kirim data ke UI jika session masih valid
+          safe_execute("window.onGoogleOAuthSuccess('#{escape_js(data['name'])}', '#{escape_js(data['email'])}', '#{escape_js(data['photo'])}')")
+        rescue
+          File.delete(AUTH_DATA_FILE)
+        end
+      end
+    end
+
+    # Modifikasi callback sukses login Anda
+    def self.on_login_success(name, email, photo)
+      session_data = { name: name, email: email, photo: photo, login_time: Time.now.to_i }
+      File.write(AUTH_DATA_FILE, session_data.to_json)
+      # ... jalankan script sukses UI ...
+    end
+
+    # Modifikasi callback sukses login Anda
+    def self.on_login_success(name, email, photo)
+      session_data = { name: name, email: email, photo: photo, login_time: Time.now.to_i }
+      File.write(AUTH_DATA_FILE, session_data.to_json)
+      # ... jalankan script sukses UI ...
+    end
 
     def self.detail_length
       @detail_length ||= DEFAULT_DETAIL_MM
@@ -116,23 +167,61 @@ module MukoRender
       if view.write_image(options)
         @last_capture = path
         @capture_source = :capture
+        
+        # --- TAMBAHKAN BARIS INI UNTUK FIX BUG ---
+        @last_result = nil # Menghapus data hasil render lama dari memori Ruby
+        
+        escaped_path = path.gsub('\\', '/')
+        
+        # Kita panggil fungsi reset UI di JS (pastikan nama fungsi di index.html sama)
+        safe_execute("setBeforeAfter('file:///#{escaped_path}', '')") 
+        safe_execute("setStatusText('Capture berhasil')")
+        # -----------------------------------------
+      else
+        safe_execute("setStatusText('❌ Gagal capture')")
+      end
+    end
+
+      if view.write_image(options)
+        @last_capture = path
+        @capture_source = :capture
         escaped_path = path.gsub('\\', '/')
         safe_execute("setBeforeAfter('file:///#{escaped_path}', '')")
         safe_execute("setStatusText('Capture berhasil')")
       else
-        safe_execute("setStatusText('âŒ Gagal capture')")
+        safe_execute("setStatusText('❌ Gagal capture')")
       end
     end
 
     def self.upload_custom_image
+
       filters = "Image Files|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff||"
+
       path = UI.openpanel("Pilih gambar", nil, filters)
+
       return unless path
 
-      unless File.exist?(path)
-        safe_execute("setStatusText('âŒ File tidak ditemukan')")
-        return
-      end
+
+
+      @last_capture = path
+
+      @capture_source = :upload
+
+      
+
+      # --- TAMBAHKAN BARIS INI ---
+
+      @last_result = nil 
+
+      
+
+      escaped_path = path.gsub('\\', '/')
+
+      safe_execute("setBeforeAfter('file:///#{escaped_path}', '')")
+
+      safe_execute("setStatusText('Gambar custom dipilih')")
+
+    end
 
       @last_capture = path
       @capture_source = :upload
@@ -143,7 +232,7 @@ module MukoRender
 
     def self.download_result
       unless @last_result && File.exist?(@last_result)
-        safe_execute("setStatusText('âŒ Tidak ada hasil untuk didownload')")
+        safe_execute("setStatusText('❌ Tidak ada hasil untuk didownload')")
         return
       end
 
@@ -153,9 +242,9 @@ module MukoRender
 
       begin
         FileUtils.cp(@last_result, save_path)
-        safe_execute("setStatusText('âœ… Hasil disimpan ke: #{File.basename(save_path)}')")
+        safe_execute("setStatusText('✅ Hasil disimpan ke: #{File.basename(save_path)}')")
       rescue => e
-        safe_execute("setStatusText('âŒ Gagal menyimpan: #{escape_js(e.message)}')")
+        safe_execute("setStatusText('❌ Gagal menyimpan: #{escape_js(e.message)}')")
       end
     end
 
@@ -167,7 +256,7 @@ module MukoRender
 
       value = input[0].to_f
       if value <= 0
-        UI.messagebox("âš ï¸ Nilai detail harus lebih besar dari 0.")
+        UI.messagebox("⚠️ Nilai detail harus lebih besar dari 0.")
       else
         self.detail_length = value
         @dialog&.execute_script("document.getElementById('detailInput').value = #{detail_length}")
@@ -179,13 +268,13 @@ module MukoRender
       puts "[Muko] render_scene called with detail: #{detail_value}"
 
       if @render_in_progress
-        safe_execute("setStatusText('â³ Render sedang berjalan...')")
+        safe_execute("setStatusText('⏳ Render sedang berjalan...')")
         return
       end
 
       value = detail_value.to_f
       if value <= 0
-        UI.messagebox("âš ï¸ Nilai detail harus lebih besar dari 0.")
+        UI.messagebox("⚠️ Nilai detail harus lebih besar dari 0.")
         return
       end
 
@@ -193,7 +282,7 @@ module MukoRender
 
       unless @last_capture && File.exist?(@last_capture)
         puts "[Muko] No capture found: #{@last_capture.inspect}"
-        safe_execute("setStatusText('âŒ Capture scene dulu sebelum render')")
+        safe_execute("setStatusText('❌ Capture scene dulu sebelum render')")
         return
       end
 
@@ -201,7 +290,7 @@ module MukoRender
 
       @render_in_progress = true
       safe_execute("startMatrixAnimation()")
-      safe_execute("setStatusText('ðŸš€ Mengirim ke ComfyUI...')")
+      safe_execute("setStatusText('🚀 Mengirim ke ComfyUI...')")
 
       puts "[Muko] Starting async render..."
       
@@ -294,7 +383,7 @@ module MukoRender
       # Timeout after 60 seconds
       if Time.now - @oauth_start_time > 60
         puts "[Muko] OAuth timeout"
-        @dialog&.execute_script("window.onGoogleOAuthError('â±ï¸ Login timeout. Silakan coba lagi.')")
+        @dialog&.execute_script("window.onGoogleOAuthError('⏱️ Login timeout. Silakan coba lagi.')")
         stop_oauth_server
         return
       end
@@ -339,7 +428,7 @@ module MukoRender
         if params['state']&.first != @oauth_state
           html = build_callback_html('Keamanan Gagal', 'State OAuth tidak valid. Silakan coba login kembali.', 'error', false)
           write_http_response(client, 400, 'Bad Request', html)
-          @dialog&.execute_script("window.onGoogleOAuthError('âš ï¸ State OAuth tidak valid. Silakan coba lagi.')")
+          @dialog&.execute_script("window.onGoogleOAuthError('⚠️ State OAuth tidak valid. Silakan coba lagi.')")
           client.close
           stop_oauth_server
           return
@@ -349,7 +438,7 @@ module MukoRender
           message = params['error_description']&.first || params['error']&.first
           html = build_callback_html('Login Dibatalkan', 'Anda membatalkan proses login. Silakan tutup tab ini dan coba lagi dari SketchUp.', 'cancel', false)
           write_http_response(client, 400, 'Bad Request', html)
-          @dialog&.execute_script("window.onGoogleOAuthError('âš ï¸ Login dibatalkan. Silakan coba lagi.')")
+          @dialog&.execute_script("window.onGoogleOAuthError('⚠️ Login dibatalkan. Silakan coba lagi.')")
           client.close
           stop_oauth_server
           return
@@ -359,7 +448,7 @@ module MukoRender
         if code.nil? || code.empty?
           html = build_callback_html('Kode Tidak Ditemukan', 'Kode OAuth tidak ditemukan. Silakan coba login kembali.', 'error', false)
           write_http_response(client, 400, 'Bad Request', html)
-          @dialog&.execute_script("window.onGoogleOAuthError('âŒ Kode OAuth tidak ditemukan.')")
+          @dialog&.execute_script("window.onGoogleOAuthError('❌ Kode OAuth tidak ditemukan.')")
           client.close
           stop_oauth_server
           return
@@ -372,7 +461,7 @@ module MukoRender
         if token_data['error']
           html = build_callback_html('Token Gagal', "Gagal mendapatkan token: #{token_data['error_description'] || token_data['error']}", 'error', false)
           write_http_response(client, 400, 'Bad Request', html)
-          @dialog&.execute_script("window.onGoogleOAuthError('âŒ Gagal mendapatkan token akses.')")
+          @dialog&.execute_script("window.onGoogleOAuthError('❌ Gagal mendapatkan token akses.')")
           client.close
           stop_oauth_server
           return
@@ -382,7 +471,7 @@ module MukoRender
         if user_info['error']
           html = build_callback_html('User Info Gagal', 'Gagal mendapatkan informasi pengguna dari Google.', 'error', false)
           write_http_response(client, 400, 'Bad Request', html)
-          @dialog&.execute_script("window.onGoogleOAuthError('âŒ Gagal mendapatkan info pengguna.')")
+          @dialog&.execute_script("window.onGoogleOAuthError('❌ Gagal mendapatkan info pengguna.')")
           client.close
           stop_oauth_server
           return
@@ -594,7 +683,7 @@ module MukoRender
       
       # Queue prompt
       step_start = Time.now
-      safe_execute("setStatusText('ðŸŽ¨ Rendering (30 steps)...')")
+      safe_execute("setStatusText('🎨 Rendering (30 steps)...')")
       
       prompt_uri = URI("#{COMFYUI_URL}/prompt")
       prompt_request = Net::HTTP::Post.new(prompt_uri)
@@ -633,7 +722,9 @@ module MukoRender
       elapsed = Time.now - @render_start_time
       
       puts "[Muko] Polling ##{@render_poll_count}, elapsed: #{elapsed.round}s"
-      safe_execute("setStatusText('🎨 Rendering... (#{elapsed.round}s)')")
+      
+      # Jangan menimpa teks jika menggunakan websocket persentase dari browser
+      # safe_execute("setStatusText('🎨 Rendering... (#{elapsed.round}s)')")
       
       begin
         history_uri = URI("#{COMFYUI_URL}/history/#{@render_prompt_id}")
@@ -671,8 +762,8 @@ module MukoRender
         puts "[Muko] Polling error: #{e.message}"
       end
       
-      # Timeout after 3 minutes
-      if elapsed > 180
+      # Timeout after 15 minutes (900 detik)
+      if elapsed > 900
         safe_execute("stopMatrixAnimation()")
         safe_execute("setStatusText('⏱️ Render timeout')")
         stop_render_polling
@@ -748,33 +839,7 @@ module MukoRender
         }
       ) { open_dialog }
 
-      # Button 2: Cost
-      cmd_cost = build_command(
-        "Cost (RAB)",
-        "Perhitungan RAB",
-        {
-          small: File.join(ASSETS_DIR, "cost.png"),
-          large: File.join(ASSETS_DIR, "cost.png")
-        }
-      ) { 
-        UI.messagebox("Cost (RAB) - Coming soon!")
-      }
-
-      # Button 3: Account
-      cmd_account = build_command(
-        "Account",
-        "Detail Akun",
-        {
-          small: File.join(ASSETS_DIR, "user.png"),
-          large: File.join(ASSETS_DIR, "user.png")
-        }
-      ) { 
-        UI.messagebox("Account detail - Coming soon!")
-      }
-
       toolbar.add_item(cmd_muko_ai)
-      toolbar.add_item(cmd_cost)
-      toolbar.add_item(cmd_account)
       toolbar.show
 
       UI.menu("Extensions").add_item(EXTENSION_NAME) { open_dialog }

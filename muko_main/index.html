@@ -209,6 +209,20 @@
       gap: 16px;
       height: calc(100% - 48px);
       overflow: hidden;
+      transition: max-width 0.3s ease;
+      padding: 0 12px;
+    }
+    
+    #costPanel {
+      max-width: 100% !important;
+      width: 100% !important;
+      overflow-y: auto !important;
+      max-height: calc(100vh - 180px) !important;
+    }
+    
+    body:has(#costPanel[style*="display: block"]) .container {
+      max-width: 100% !important;
+      width: 100% !important;
     }
     .header {
       display: flex;
@@ -327,6 +341,56 @@
       margin: 0 0 8px;
       font-size: 14px;
     }
+    .hidden {
+      display: none !important;
+    }
+    .cost-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .cost-tab {
+      padding: 8px 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .cost-tab.active {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: #4338ca;
+    }
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .cost-table th,
+    .cost-table td {
+      border: 1px solid var(--border);
+      padding: 6px;
+      text-align: left;
+    }
+    .cost-table th {
+      background: #f8fafc;
+      font-weight: 600;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 11px;
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .badge.ok {
+      background: #dcfce7;
+      color: #166534;
+    }
     .row {
       display: flex;
       gap: 8px;
@@ -437,7 +501,7 @@
       <div class="spinner" id="spinner"></div>
     </div>
   </div>
-  <section class="page landing active" id="landingPage">
+  <section class="page landing active" id="landingPage" style="width: 920px;">
     <div class="landing-header">
       <div class="brand-logo">
         <img src="assets/logo.svg" width="32" height="32" alt="Muko" />
@@ -459,6 +523,10 @@
           </svg>
           Lanjutkan dengan Google
         </button>
+        <div class="divider">atau</div>
+        <button class="button ghost-dark" onclick="handleGuestLogin()">
+          Masuk sebagai Guest (Testing)
+        </button>
       </div>
     </div>
     
@@ -477,28 +545,27 @@
   </section>
 
   <section class="page" id="mainPage">
-    <div class="container">
-      <div class="header">
-        <div class="logo">
-          <img src="assets/logo.svg" width="24" height="24" alt="Muko" style="vertical-align: middle;" />
-          MUKO AI
+    <div class="header" style="position: sticky; top: 0; z-index: 100; background: var(--bg); padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+      <div class="logo" style="display: flex; align-items: center; gap: 8px;">
+        <img src="assets/logo.svg" width="24" height="24" alt="Muko" />
+        <span style="font-weight: 700; font-size: 16px;">MUKO AI</span>
+      </div>
+      <div class="profile-container">
+        <div class="profile-avatar" onclick="toggleProfileDropdown()" id="profileAvatar">
+          <img src="" alt="Profile" id="profilePhoto" />
         </div>
-        <div class="profile-container">
-          <div class="profile-avatar" onclick="toggleProfileDropdown()" id="profileAvatar">
-            <img src="" alt="Profile" id="profilePhoto" />
+        <div class="profile-dropdown" id="profileDropdown">
+          <div class="profile-info">
+            <div class="profile-name" id="profileName">User Name</div>
+            <div class="profile-email" id="profileEmail">user@example.com</div>
+            <div class="profile-status" id="profileStatus">Free</div>
           </div>
-          <div class="profile-dropdown" id="profileDropdown">
-            <div class="profile-info">
-              <div class="profile-name" id="profileName">User Name</div>
-              <div class="profile-email" id="profileEmail">user@example.com</div>
-              <div class="profile-status" id="profileStatus">Free</div>
-            </div>
-            <button class="button ghost" onclick="handleLogout()" style="width: 100%; margin-top: 12px;">Logout</button>
-          </div>
+          <button class="button ghost" onclick="handleLogout()" style="width: 100%; margin-top: 12px;">Logout</button>
         </div>
       </div>
-
-      <div class="panel grid">
+    </div>
+    <div class="container" id="mainContainer" style="padding-top: 0;">
+      <div class="panel grid" id="renderPanel">
         <div class="preview" id="preview">
           <span id="previewPlaceholder">Klik Capture atau Upload untuk memulai</span>
           <div id="matrixCanvas" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;"></div>
@@ -514,13 +581,78 @@
         <!-- Slider removed - divider is now draggable -->
       </div>
 
-      <div class="panel grid">
+      <div class="panel grid" id="renderActions">
         <div class="row">
           <button class="button" onclick="muko.captureScene()" style="flex: 1;">Capture Scene</button>
           <button class="button secondary" onclick="muko.uploadImage()" style="flex: 1;">Upload</button>
         </div>
         <button class="button primary-dark" onclick="muko.renderAI()" style="width: 100%;">Render AI</button>
         <button class="button secondary" id="downloadBtn" onclick="muko.downloadResult()" style="display: none; width: 100%;">Download Hasil</button>
+      </div>
+
+      <div class="panel grid" id="costPanel" style="display: none;">
+        <div class="row" style="align-items: center; justify-content: space-between;">
+          <h3>Cost (RAB)</h3>
+          <button class="button secondary" onclick="cost.saveState()">Save</button>
+        </div>
+        <div class="cost-tabs">
+          <button class="cost-tab active" data-tab="scan" onclick="cost.switchTab('scan')">Scan & Mapping</button>
+          <button class="cost-tab" data-tab="price" onclick="cost.switchTab('price')">Harga</button>
+          <button class="cost-tab" data-tab="recap" onclick="cost.switchTab('recap')">Rekap</button>
+        </div>
+
+        <div id="costTabScan" class="panel">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <div style="font-size: 12px; color: var(--muted);">Scan tag & mapping kategori</div>
+            <button class="button secondary" onclick="cost.scanTags()">Scan Tag</button>
+          </div>
+          <div id="costScanSummary" style="margin-top: 8px; font-size: 12px; color: var(--muted);">Belum ada data scan.</div>
+          <table class="cost-table" style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Entities</th>
+                <th>Kategori</th>
+                <th>Metode</th>
+                <th>Unit</th>
+                <th>Waste %</th>
+              </tr>
+            </thead>
+            <tbody id="costScanBody"></tbody>
+          </table>
+          <div class="row" style="margin-top: 10px; gap: 6px;">
+            <button class="button ghost" onclick="cost.highlightUnknown(true)">Highlight Untagged</button>
+            <button class="button ghost" onclick="cost.highlightUnknown(false)">Clear Highlight</button>
+          </div>
+        </div>
+
+        <div id="costTabPrice" class="panel hidden">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <div style="font-size: 12px; color: var(--muted);">Harga satuan per material</div>
+            <button class="button secondary" onclick="cost.updatePrices()">🔄 Cek Harga Terkini</button>
+          </div>
+          <div id="costPriceBody" style="margin-top: 8px;"></div>
+        </div>
+
+        <div id="costTabRecap" class="panel hidden">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <div style="font-size: 12px; color: var(--muted);">Rekap RAB</div>
+            <button class="button secondary" onclick="cost.exportCsv()">Export CSV</button>
+          </div>
+          <table class="cost-table" style="margin-top: 8px;">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Harga</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="costRecapBody"></tbody>
+          </table>
+          <div id="costRecapTotal" style="margin-top: 8px; font-weight: 600; font-size: 16px; text-align: right; padding: 10px; background: #eef2ff; border-radius: 8px;">Total: Rp 0</div>
+        </div>
       </div>
 
       <div class="footer" style="text-align: center; color: var(--muted); font-size: 12px;">
@@ -536,9 +668,47 @@
     const afterImage = document.getElementById('afterImage');
     const loaderPage = document.getElementById('loaderPage');
     const loaderContent = document.getElementById('loaderContent');
+    const beforeImage = document.getElementById('beforeImage');
+    const previewPlaceholder = document.getElementById('previewPlaceholder');
+    const previewDivider = document.getElementById('previewDivider');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const costPanel = document.getElementById('costPanel');
+    const costTabs = document.querySelectorAll('.cost-tab');
+    const costTabScan = document.getElementById('costTabScan');
+    const costTabPrice = document.getElementById('costTabPrice');
+    const costTabRecap = document.getElementById('costTabRecap');
+    const costScanBody = document.getElementById('costScanBody');
+    const costScanSummary = document.getElementById('costScanSummary');
+    const costPriceBody = document.getElementById('costPriceBody');
+    const costRecapBody = document.getElementById('costRecapBody');
+    const costRecapTotal = document.getElementById('costRecapTotal');
 
     // Global state
     let currentUser = null;
+    let costState = {
+      version: '2.0.0',
+      updated_at: null,
+      items: [], // Each item now has materials array
+      settings: {
+        unit_defaults: {
+          'Dinding': 'm2',
+          'Lantai': 'm2',
+          'Plafon': 'm2',
+          'Atap': 'm2',
+          'Kolom': 'm3',
+          'Balok': 'm3',
+          'Pondasi': 'm3',
+          'Finishing': 'm2',
+          'Kusen': 'unit',
+          'Pintu': 'unit',
+          'Jendela': 'unit',
+          'Pagar': 'm1'
+        }
+      }
+    };
+    let costScan = [];
+    let costQty = {};
 
     // Loader sequence
     function startLoader() {
@@ -550,7 +720,22 @@
 
     // Start loader on page load
     startLoader();
-    
+
+    function resetBeforeAfterView() {
+      if (beforeImage) beforeImage.src = '';
+      if (afterImage) {
+        afterImage.src = '';
+        afterImage.style.clipPath = 'inset(0 50% 0 0)';
+      }
+      if (previewDivider) {
+        previewDivider.style.left = '50%';
+        previewDivider.style.display = 'none';
+      }
+      if (fullscreenBtn) fullscreenBtn.style.display = 'none';
+      if (downloadBtn) downloadBtn.style.display = 'none';
+      if (previewPlaceholder) previewPlaceholder.style.display = 'block';
+    }
+
     function showMainPage() {
       landingPage.classList.remove('active');
       mainPage.classList.add('active');
@@ -561,6 +746,13 @@
       landingPage.classList.add('active');
     }
     
+    resetBeforeAfterView();
+
+    // Pull persisted session when JS loads (in case Ruby calls later or not at all)
+    if (window.sketchup && window.sketchup.load_saved_session) {
+      window.sketchup.load_saved_session();
+    }
+
     // Google Sign-In Handler
     async function handleGoogleSignIn() {
       if (window.sketchup && window.sketchup.start_google_oauth) {
@@ -569,6 +761,16 @@
         return;
       }
       showCustomAlert('Login Google tidak tersedia di lingkungan ini.');
+    }
+    
+    // Guest Login Handler
+    async function handleGuestLogin() {
+      if (window.sketchup && window.sketchup.login_guest) {
+        setStatus('Login sebagai Guest...');
+        window.sketchup.login_guest();
+        return;
+      }
+      showCustomAlert('Login Guest tidak tersedia di lingkungan ini.');
     }
 
     window.onGoogleOAuthSuccess = function(name, email, photoUrl) {
@@ -630,10 +832,6 @@
       setStatus('Cookie ditolak');
       document.querySelector('.cookie-box').style.display = 'none';
     }
-
-    const previewDivider = document.getElementById('previewDivider');
-    const fullscreenBtn = document.getElementById('fullscreenBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
 
     // Make divider draggable
     let isDragging = false;
@@ -711,13 +909,510 @@
       },
       openMukoAI: () => {
         setStatus('Muko AI aktif');
+        const renderPanel = document.getElementById('renderPanel');
+        const renderActions = document.getElementById('renderActions');
+        const mainContainer = document.getElementById('mainContainer');
+        const mainPage = document.getElementById('mainPage');
+        
+        if (renderPanel) renderPanel.style.display = 'block';
+        if (renderActions) renderActions.style.display = 'block';
+        if (costPanel) costPanel.style.display = 'none';
+        
+        if (mainPage) {
+          mainPage.style.width = '468px';
+        }
+        
+        if (mainContainer) {
+          mainContainer.style.maxWidth = '420px';
+          mainContainer.style.width = 'auto';
+          mainContainer.style.padding = '0 12px';
+        }
       },
       openCost: () => {
-        setStatus('Cost (RAB) siap digunakan');
+        setStatus('Cost (RAB) dibuka');
+        const renderPanel = document.getElementById('renderPanel');
+        const renderActions = document.getElementById('renderActions');
+        const mainContainer = document.getElementById('mainContainer');
+        const mainPage = document.getElementById('mainPage');
+        
+        if (renderPanel) renderPanel.style.display = 'none';
+        if (renderActions) renderActions.style.display = 'none';
+        if (costPanel) {
+          costPanel.style.display = 'block';
+        }
+        
+        // Force full width on body
+        if (mainPage) {
+          mainPage.style.width = '920px';
+        }
+        
+        // Force full width on container
+        if (mainContainer) {
+          mainContainer.style.maxWidth = '100%';
+          mainContainer.style.width = '100%';
+          mainContainer.style.padding = '0 20px';
+        }
+        
+        cost.switchTab('scan');
+        cost.loadState();
       },
       openAccount: () => {
         setStatus('Account detail dibuka');
       }
+    };
+
+    const cost = {
+      switchTab: (tab) => {
+        const tabs = {
+          scan: costTabScan,
+          price: costTabPrice,
+          recap: costTabRecap
+        };
+        costTabs.forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === tab));
+        Object.entries(tabs).forEach(([key, el]) => {
+          if (!el) return;
+          el.classList.toggle('hidden', key !== tab);
+        });
+      },
+      scanTags: () => {
+        if (!window.sketchup || !window.sketchup.rab_scan_tags) {
+          setStatus('❌ Callback scan tag belum tersedia');
+          return;
+        }
+        setStatus('🔍 Scan tag...');
+        window.sketchup.rab_scan_tags();
+      },
+      applyScanResult: (payload) => {
+        console.log('[Cost] applyScanResult called, payload:', payload);
+        costScan = payload.tags || [];
+        
+        // AI already classified with material breakdown
+        costState.items = costScan.map((tag) => ({
+          tag_name: tag.name,
+          category: tag.category || cost.guessCategory(tag.name),
+          method: tag.method || cost.defaultMethod(tag.category || 'Lainnya'),
+          unit: tag.unit || cost.defaultUnit(tag.category || 'Lainnya'),
+          qty_base: tag.qty_base || 0,
+          waste_percent: tag.waste_percent || 0,
+          materials: tag.materials || [], // AI breakdown materials
+          total: 0
+        }));
+        
+        costScanSummary.textContent = `Tag terdeteksi: ${costScan.length} (AI classified + breakdown)`;
+        console.log('[Cost] After AI sync, items:', costState.items);
+        cost.renderScanMapping();
+        cost.renderPrices();
+        setStatus(`✅ Scan selesai: ${costScan.length} tag (AI classified)`);
+      },
+      renderScanMapping: () => {
+        console.log('[Cost] renderScanMapping called, items:', costState.items.length);
+        if (!costState.items || costState.items.length === 0) {
+          costScanBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Belum ada data. Scan tag terlebih dahulu.</td></tr>';
+          return;
+        }
+        const tagCountMap = new Map(costScan.map(t => [t.name, t.count]));
+        
+        let html = '';
+        costState.items.forEach((item, idx) => {
+          const count = tagCountMap.get(item.tag_name) || 0;
+          const materialCount = item.materials?.length || 0;
+          
+          // Row header (tag/kategori)
+          html += `
+            <tr style="background: #f8fafc; font-weight: 600;">
+              <td colspan="6">
+                ${item.tag_name} 
+                <span style="color: var(--muted); font-weight: normal; font-size: 11px;">
+                  (${count} entities, ${materialCount} materials)
+                </span>
+              </td>
+            </tr>
+          `;
+          
+          // Material rows
+          if (item.materials && item.materials.length > 0) {
+            item.materials.forEach((mat, matIdx) => {
+              html += `
+                <tr>
+                  <td style="padding-left: 20px;">└ ${mat.name}</td>
+                  <td>${mat.qty?.toFixed(2) || 0}</td>
+                  <td>${mat.unit || ''}</td>
+                  <td colspan="3">
+                    <span style="font-size: 11px; color: var(--muted);">
+                      Auto-calculated by AI
+                    </span>
+                  </td>
+                </tr>
+              `;
+            });
+          } else {
+            html += `
+              <tr>
+                <td colspan="6" style="padding-left: 20px; color: var(--muted); font-size: 11px;">
+                  No material breakdown yet
+                </td>
+              </tr>
+            `;
+          }
+        });
+        
+        costScanBody.innerHTML = html;
+      },
+      syncItemsFromScan: () => {
+        console.log('[Cost] syncItemsFromScan, costScan:', costScan);
+        const existing = new Map(costState.items.map(item => [item.tag_name, item]));
+        const scannedTags = new Set(costScan.map(t => t.name));
+        
+        costScan.forEach((tag) => {
+          if (!existing.has(tag.name)) {
+            const defaultCategory = cost.guessCategory(tag.name);
+            const defaultMethod = cost.defaultMethod(defaultCategory);
+            const defaultUnit = cost.defaultUnit(defaultCategory);
+            existing.set(tag.name, {
+              tag_name: tag.name,
+              category: defaultCategory,
+              method: defaultMethod,
+              unit: defaultUnit,
+              unit_price: 0,
+              waste_percent: 0,
+              coeff: null
+            });
+          }
+        });
+        
+        // Keep all items from scan
+        costState.items = Array.from(existing.values()).filter(item => scannedTags.has(item.tag_name));
+        console.log('[Cost] syncItemsFromScan result:', costState.items);
+      },
+      guessCategory: (tagName) => {
+        const name = (tagName || '').toLowerCase();
+        if (name.includes('dinding')) return 'Dinding';
+        if (name.includes('kolom')) return 'Kolom';
+        if (name.includes('balok')) return 'Balok';
+        if (name.includes('pondasi')) return 'Pondasi';
+        if (name.includes('lantai') || name.includes('slab')) return 'Lantai';
+        if (name.includes('plafon')) return 'Plafon';
+        if (name.includes('atap')) return 'Atap';
+        if (name.includes('pintu')) return 'Pintu';
+        if (name.includes('jendela')) return 'Jendela';
+        if (name.includes('kusen')) return 'Kusen';
+        if (name.includes('pagar') || name.includes('railing')) return 'Pagar';
+        return 'Lainnya';
+      },
+      defaultMethod: (category) => {
+        if (['Kolom', 'Balok', 'Pondasi'].includes(category)) return 'volume';
+        if (['Dinding', 'Lantai', 'Plafon', 'Atap', 'Finishing'].includes(category)) return 'area';
+        if (['Pagar'].includes(category)) return 'length';
+        if (['Pintu', 'Jendela', 'Kusen'].includes(category)) return 'count';
+        return 'count';
+      },
+      defaultUnit: (category) => {
+        return costState.settings.unit_defaults[category] || 'unit';
+      },
+      renderPrices: () => {
+        if (!costState.items || costState.items.length === 0) {
+          costPriceBody.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;">Belum ada data. Scan tag terlebih dahulu.</div>';
+          return;
+        }
+        
+        let html = '';
+        costState.items.forEach((item, idx) => {
+          // Header
+          html += `
+            <div style="background: #f8fafc; padding: 10px; margin-top: 12px; border-radius: 8px; font-weight: 600;">
+              ${item.tag_name}
+            </div>
+          `;
+          
+          // Materials table
+          if (item.materials && item.materials.length > 0) {
+            html += `
+              <table class="cost-table" style="margin-top: 8px;">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Harga Satuan</th>
+                    <th>Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+            
+            item.materials.forEach((mat, matIdx) => {
+              const subtotal = (mat.qty || 0) * (mat.unit_price || 0);
+              html += `
+                <tr>
+                  <td>${mat.name}</td>
+                  <td>${mat.qty?.toFixed(2) || 0}</td>
+                  <td>${mat.unit || ''}</td>
+                  <td>
+                    <input 
+                      class="input" 
+                      type="number" 
+                      value="${mat.unit_price || 0}" 
+                      data-idx="${idx}" 
+                      data-mat-idx="${matIdx}" 
+                      data-field="unit_price" 
+                      oninput="cost.updateMaterialPrice(event)"
+                      style="width: 120px;"
+                    />
+                  </td>
+                  <td>${subtotal.toLocaleString('id-ID')}</td>
+                </tr>
+              `;
+            });
+            
+            html += `
+                </tbody>
+              </table>
+            `;
+          } else {
+            html += `<div style="padding: 10px; color: var(--muted); font-size: 12px;">No materials</div>`;
+          }
+        });
+        
+        costPriceBody.innerHTML = html;
+      },
+      updateMaterialPrice: (event) => {
+        const idx = Number(event.target.dataset.idx);
+        const matIdx = Number(event.target.dataset.matIdx);
+        const value = Number(event.target.value || 0);
+        
+        if (Number.isFinite(idx) && Number.isFinite(matIdx)) {
+          costState.items[idx].materials[matIdx].unit_price = value;
+          cost.renderPrices();
+          cost.refreshRecap();
+        }
+      },
+      updatePrices: () => {
+        if (!window.sketchup || !window.sketchup.rab_update_prices) {
+          setStatus('❌ Callback update harga belum tersedia');
+          return;
+        }
+        setStatus('🤖 AI sedang estimasi harga pasar Indonesia...');
+        window.sketchup.rab_update_prices(JSON.stringify(costState.items));
+      },
+      applyPriceUpdate: (payload) => {
+        if (!payload || !payload.items) return;
+        
+        payload.items.forEach((updatedItem, idx) => {
+          if (costState.items[idx] && updatedItem.materials) {
+            updatedItem.materials.forEach((mat, matIdx) => {
+              if (costState.items[idx].materials[matIdx]) {
+                costState.items[idx].materials[matIdx].unit_price = mat.unit_price || 0;
+              }
+            });
+          }
+        });
+        
+        cost.renderPrices();
+        cost.refreshRecap();
+        setStatus('✅ Harga berhasil diupdate dari AI');
+      },
+      updateItemField: (event) => {
+        const idx = Number(event.target.dataset.idx);
+        const field = event.target.dataset.field;
+        if (!Number.isFinite(idx) || !field) return;
+        const value = event.target.type === 'number' ? Number(event.target.value || 0) : event.target.value;
+        costState.items[idx][field] = value;
+        if (field === 'category') {
+          costState.items[idx].method = cost.defaultMethod(value);
+          costState.items[idx].unit = cost.defaultUnit(value);
+          cost.renderScanMapping();
+          cost.renderPrices();
+        }
+        if (field === 'unit_price' || field === 'waste_percent') {
+          cost.ensureComputed();
+        }
+        cost.refreshRecap();
+      },
+      computeQty: () => {
+        if (!window.sketchup || !window.sketchup.rab_compute_qty) {
+          setStatus('❌ Callback hitung qty belum tersedia');
+          return;
+        }
+        window.sketchup.rab_compute_qty(JSON.stringify(costState.items));
+      },
+      applyQtyResult: (payload) => {
+        costQty = payload.qty || {};
+        cost.refreshRecap();
+      },
+      refreshRecap: () => {
+        let grandTotal = 0;
+        let html = '';
+        
+        costState.items.forEach((item) => {
+          let categoryTotal = 0;
+          
+          // Header kategori
+          html += `
+            <tr style="background: #f8fafc; font-weight: 600;">
+              <td colspan="6">${item.tag_name}</td>
+            </tr>
+          `;
+          
+          // Materials
+          if (item.materials && item.materials.length > 0) {
+            item.materials.forEach((mat) => {
+              const subtotal = (mat.qty || 0) * (mat.unit_price || 0);
+              categoryTotal += subtotal;
+              html += `
+                <tr>
+                  <td style="padding-left: 20px;">${mat.name}</td>
+                  <td>${mat.qty?.toFixed(2) || 0}</td>
+                  <td>${mat.unit || ''}</td>
+                  <td>${(mat.unit_price || 0).toLocaleString('id-ID')}</td>
+                  <td>${subtotal.toLocaleString('id-ID')}</td>
+                </tr>
+              `;
+            });
+          }
+          
+          // Subtotal kategori
+          html += `
+            <tr style="font-weight: 600; background: #fafafa;">
+              <td colspan="4" style="text-align: right;">Subtotal ${item.tag_name}:</td>
+              <td>${categoryTotal.toLocaleString('id-ID')}</td>
+            </tr>
+          `;
+          
+          grandTotal += categoryTotal;
+        });
+        
+        costRecapBody.innerHTML = html;
+        costRecapTotal.textContent = `Total RAB: Rp ${grandTotal.toLocaleString('id-ID')}`;
+      },
+      exportCsv: () => {
+        const rows = costState.items.map((item) => {
+          const qty = costQty[item.tag_name] || 0;
+          const wasteFactor = 1 + (Number(item.waste_percent || 0) / 100);
+          const qtyGross = qty * wasteFactor;
+          const subtotal = qtyGross * Number(item.unit_price || 0);
+          return [item.category, item.tag_name, qtyGross.toFixed(3), item.unit, item.unit_price, subtotal];
+        });
+        if (window.sketchup && window.sketchup.rab_export_csv) {
+          window.sketchup.rab_export_csv(JSON.stringify({ rows }));
+        } else {
+          setStatus('❌ Export CSV belum tersedia');
+        }
+      },
+      saveState: () => {
+        costState.updated_at = new Date().toISOString();
+        if (window.sketchup && window.sketchup.rab_save_state) {
+          window.sketchup.rab_save_state(JSON.stringify(costState));
+          setStatus('✅ RAB disimpan');
+        }
+      },
+      loadState: () => {
+        if (window.sketchup && window.sketchup.rab_load_state) {
+          window.sketchup.rab_load_state();
+        }
+      },
+      applyLoadedState: (payload) => {
+        if (!payload) return;
+        costState = payload;
+        cost.renderScanMapping();
+        cost.renderPrices();
+        cost.ensureComputed();
+      },
+      highlightUnknown: (enable) => {
+        if (window.sketchup && window.sketchup.rab_highlight_unknown) {
+          window.sketchup.rab_highlight_unknown(enable ? 'on' : 'off', JSON.stringify(costState.items));
+        }
+      },
+      ensureComputed: () => {
+        if (!costState.items.length) return;
+        cost.computeQty();
+      }
+    };
+
+    window.onRabScanResult = function(payloadJson) {
+      console.log('[Cost] ==========================================');
+      console.log('[Cost] onRabScanResult called');
+      console.log('[Cost] Payload JSON length:', payloadJson?.length);
+      console.log('[Cost] Payload preview:', payloadJson?.substring(0, 200));
+      try {
+        const payload = JSON.parse(payloadJson || '{}');
+        console.log('[Cost] ✅ JSON parsed successfully');
+        console.log('[Cost] Parsed payload:', payload);
+        console.log('[Cost] Tags count:', payload.tags?.length);
+        
+        if (!payload.tags || payload.tags.length === 0) {
+          console.error('[Cost] ❌ No tags in payload!');
+          return false;
+        }
+        
+        cost.applyScanResult(payload);
+        console.log('[Cost] ✅ applyScanResult completed');
+        console.log('[Cost] costState.items length:', costState?.items?.length);
+        console.log('[Cost] ==========================================');
+        return true;
+      } catch (e) {
+        console.error('[Cost] ❌ Parse error:', e);
+        console.error('[Cost] Error stack:', e.stack);
+        console.error('[Cost] Payload:', payloadJson?.substring(0, 500));
+        console.log('[Cost] ==========================================');
+        return false;
+      }
+    };
+    
+    // Notify Ruby that dialog is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('[Cost] ==========================================');
+      console.log('[Cost] DOM Content Loaded');
+      console.log('[Cost] typeof window.onRabScanResult:', typeof window.onRabScanResult);
+      console.log('[Cost] typeof cost:', typeof cost);
+      console.log('[Cost] typeof muko:', typeof muko);
+      console.log('[Cost] typeof window.sketchup:', typeof window.sketchup);
+      
+      // AUTO-OPEN COST PANEL if this is cost dialog
+      // Check if URL or context indicates this should be cost dialog
+      if (typeof muko !== 'undefined' && typeof muko.openCost === 'function') {
+        console.log('[Cost] Auto-opening Cost panel...');
+        muko.openCost();
+        if (typeof cost !== 'undefined' && typeof cost.loadState === 'function') {
+          cost.loadState();
+        }
+      }
+      
+      if (window.sketchup && window.sketchup.cost_dialog_ready) {
+        window.sketchup.cost_dialog_ready();
+        console.log('[Cost] ✅ Notified Ruby that dialog is ready');
+      } else {
+        console.warn('[Cost] ⚠️ window.sketchup.cost_dialog_ready not available');
+      }
+      
+      // Verify all required objects are ready
+      if (typeof cost === 'object') {
+        console.log('[Cost] ✅ cost object is ready');
+      } else {
+        console.error('[Cost] ❌ cost object NOT ready!');
+      }
+      
+      if (typeof window.onRabScanResult === 'function') {
+        console.log('[Cost] ✅ onRabScanResult function is ready');
+      } else {
+        console.error('[Cost] ❌ onRabScanResult function NOT ready!');
+      }
+      
+      console.log('[Cost] ==========================================');
+    });
+
+    window.onRabQtyResult = function(payloadJson) {
+      const payload = JSON.parse(payloadJson || '{}');
+      cost.applyQtyResult(payload);
+    };
+
+    window.onRabStateLoaded = function(payloadJson) {
+      const payload = JSON.parse(payloadJson || '{}');
+      cost.applyLoadedState(payload);
+    };
+    
+    window.onRabPriceUpdate = function(payloadJson) {
+      const payload = JSON.parse(payloadJson || '{}');
+      cost.applyPriceUpdate(payload);
     };
 
     function toggleProfileDropdown() {
@@ -727,6 +1422,10 @@
 
     function handleLogout() {
       document.getElementById('profileDropdown').classList.remove('active');
+      currentUser = null;
+      if (window.sketchup && window.sketchup.logout) {
+        window.sketchup.logout();
+      }
       showLandingPage();
     }
 
@@ -744,19 +1443,30 @@
     }
 
     window.setBeforeAfter = function(beforePath, afterPath) {
-      const placeholder = document.getElementById('previewPlaceholder');
       if (beforePath) {
-        document.getElementById('beforeImage').src = beforePath;
-        if (placeholder) placeholder.style.display = 'none';
+        beforeImage.src = beforePath;
+        if (previewPlaceholder) previewPlaceholder.style.display = 'none';
+      } else {
+        beforeImage.src = '';
       }
+
       if (afterPath) {
-        document.getElementById('afterImage').src = afterPath;
-        if (placeholder) placeholder.style.display = 'none';
-        
+        afterImage.src = afterPath;
+        afterImage.style.clipPath = 'inset(0 50% 0 0)';
+        if (previewPlaceholder) previewPlaceholder.style.display = 'none';
+
         // Show divider, fullscreen button, and download button when render completes
+        previewDivider.style.left = '50%';
         previewDivider.style.display = 'block';
         fullscreenBtn.style.display = 'flex';
         downloadBtn.style.display = 'block';
+      } else {
+        afterImage.src = '';
+        afterImage.style.clipPath = 'inset(0 50% 0 0)';
+        previewDivider.style.left = '50%';
+        previewDivider.style.display = 'none';
+        fullscreenBtn.style.display = 'none';
+        downloadBtn.style.display = 'none';
       }
     };
 
